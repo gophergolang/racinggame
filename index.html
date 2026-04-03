@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Street Racer - 3D Racing Game</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { overflow: hidden; background: #000; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    canvas { display: block; }
+
+    #loading-screen {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      z-index: 1000; transition: opacity 0.5s;
+    }
+    #loading-screen.hidden { opacity: 0; pointer-events: none; }
+    #loading-screen h1 {
+      font-size: 64px; color: #e94560; text-shadow: 0 0 30px rgba(233,69,96,0.5);
+      font-weight: 900; letter-spacing: 4px; margin-bottom: 10px;
+    }
+    #loading-screen .subtitle { color: #a8a8b8; font-size: 18px; margin-bottom: 40px; }
+    .loading-bar-container {
+      width: 300px; height: 6px; background: rgba(255,255,255,0.1);
+      border-radius: 3px; overflow: hidden;
+    }
+    .loading-bar {
+      height: 100%; width: 0%; background: linear-gradient(90deg, #e94560, #ff6b8a);
+      border-radius: 3px; transition: width 0.3s;
+    }
+    #loading-text { color: #666; margin-top: 15px; font-size: 14px; }
+
+    #menu-screen {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      display: none; flex-direction: column; align-items: center; justify-content: center;
+      z-index: 900;
+    }
+    #menu-screen.active { display: flex; }
+    #menu-screen h1 {
+      font-size: 72px; color: #e94560; text-shadow: 0 0 40px rgba(233,69,96,0.5);
+      font-weight: 900; letter-spacing: 6px; margin-bottom: 5px;
+    }
+    #menu-screen .tagline { color: #8888aa; font-size: 16px; margin-bottom: 50px; }
+
+    .menu-section { margin-bottom: 30px; text-align: center; }
+    .menu-section h3 { color: #e94560; font-size: 14px; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 15px; }
+
+    .car-select, .track-select { display: flex; gap: 15px; justify-content: center; }
+    .car-option, .track-option {
+      padding: 15px 25px; background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.1);
+      border-radius: 10px; color: #ccc; cursor: pointer; transition: all 0.3s; min-width: 140px;
+    }
+    .car-option:hover, .track-option:hover { border-color: #e94560; background: rgba(233,69,96,0.1); }
+    .car-option.selected, .track-option.selected {
+      border-color: #e94560; background: rgba(233,69,96,0.2); color: #fff;
+      box-shadow: 0 0 20px rgba(233,69,96,0.3);
+    }
+    .car-option .car-name, .track-option .track-name { font-weight: 700; font-size: 16px; margin-bottom: 5px; }
+    .car-option .car-stats, .track-option .track-info { font-size: 11px; color: #888; }
+    .track-option .track-difficulty { font-size: 12px; margin-top: 5px; }
+    .difficulty-easy { color: #4ecdc4; }
+    .difficulty-medium { color: #f9c74f; }
+    .difficulty-hard { color: #e94560; }
+
+    #start-btn {
+      margin-top: 30px; padding: 18px 60px; font-size: 20px; font-weight: 700;
+      background: linear-gradient(135deg, #e94560, #c23152); color: #fff; border: none;
+      border-radius: 50px; cursor: pointer; letter-spacing: 3px; text-transform: uppercase;
+      transition: all 0.3s; box-shadow: 0 5px 30px rgba(233,69,96,0.4);
+    }
+    #start-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 40px rgba(233,69,96,0.6); }
+
+    #hud {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none; display: none; z-index: 100;
+    }
+    #hud.active { display: block; }
+
+    .hud-speed {
+      position: absolute; bottom: 30px; right: 30px;
+      background: rgba(0,0,0,0.6); backdrop-filter: blur(10px);
+      border-radius: 15px; padding: 20px 30px; text-align: center;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .hud-speed .speed-value { font-size: 48px; font-weight: 900; color: #fff; }
+    .hud-speed .speed-unit { font-size: 14px; color: #888; }
+
+    .hud-info {
+      position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+      display: flex; gap: 30px;
+    }
+    .hud-info-item {
+      background: rgba(0,0,0,0.6); backdrop-filter: blur(10px);
+      border-radius: 10px; padding: 12px 20px; text-align: center;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .hud-info-item .label { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 2px; }
+    .hud-info-item .value { font-size: 22px; font-weight: 700; color: #fff; }
+
+    .hud-position {
+      position: absolute; top: 20px; left: 20px;
+      background: rgba(0,0,0,0.6); backdrop-filter: blur(10px);
+      border-radius: 10px; padding: 15px 20px; border: 1px solid rgba(255,255,255,0.1);
+    }
+    .hud-position .pos-value { font-size: 36px; font-weight: 900; color: #e94560; }
+    .hud-position .pos-suffix { font-size: 16px; color: #e94560; }
+    .hud-position .pos-total { font-size: 14px; color: #888; }
+
+    .hud-minimap {
+      position: absolute; bottom: 30px; left: 30px;
+      width: 180px; height: 180px;
+      background: rgba(0,0,0,0.6); backdrop-filter: blur(10px);
+      border-radius: 15px; border: 1px solid rgba(255,255,255,0.1);
+      overflow: hidden;
+    }
+    .hud-minimap canvas { width: 100%; height: 100%; }
+
+    #countdown {
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      font-size: 120px; font-weight: 900; color: #e94560;
+      text-shadow: 0 0 50px rgba(233,69,96,0.8); display: none; z-index: 200;
+      animation: countPulse 1s ease-in-out;
+    }
+    @keyframes countPulse {
+      0% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
+      50% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+      100% { transform: translate(-50%, -50%) scale(0.8); opacity: 0; }
+    }
+
+    #race-result {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.8); display: none; z-index: 500;
+      flex-direction: column; align-items: center; justify-content: center;
+    }
+    #race-result.active { display: flex; }
+    #race-result h2 { font-size: 60px; font-weight: 900; margin-bottom: 10px; }
+    #race-result .result-win { color: #4ecdc4; text-shadow: 0 0 30px rgba(78,205,196,0.5); }
+    #race-result .result-lose { color: #e94560; text-shadow: 0 0 30px rgba(233,69,96,0.5); }
+    #race-result .result-time { color: #fff; font-size: 24px; margin-bottom: 30px; }
+    #race-result .result-details { color: #888; font-size: 16px; margin-bottom: 40px; }
+    .result-btn {
+      padding: 15px 40px; font-size: 16px; font-weight: 700; border: none;
+      border-radius: 50px; cursor: pointer; margin: 5px; letter-spacing: 2px;
+      text-transform: uppercase; transition: all 0.3s; pointer-events: all;
+    }
+    .result-btn.primary {
+      background: linear-gradient(135deg, #e94560, #c23152); color: #fff;
+      box-shadow: 0 5px 20px rgba(233,69,96,0.4);
+    }
+    .result-btn.secondary {
+      background: rgba(255,255,255,0.1); color: #ccc; border: 1px solid rgba(255,255,255,0.2);
+    }
+    .result-btn:hover { transform: translateY(-2px); }
+
+    .controls-hint {
+      position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%);
+      color: rgba(255,255,255,0.3); font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div id="loading-screen">
+    <h1>STREET RACER</h1>
+    <div class="subtitle">Loading assets...</div>
+    <div class="loading-bar-container">
+      <div class="loading-bar" id="loading-bar"></div>
+    </div>
+    <div id="loading-text">Initializing...</div>
+  </div>
+
+  <div id="menu-screen">
+    <h1>STREET RACER</h1>
+    <div class="tagline">Race through the city streets</div>
+
+    <div class="menu-section">
+      <h3>Choose Your Car</h3>
+      <div class="car-select" id="car-select"></div>
+    </div>
+
+    <div class="menu-section">
+      <h3>Select Track</h3>
+      <div class="track-select" id="track-select"></div>
+    </div>
+
+    <button id="start-btn">RACE</button>
+  </div>
+
+  <div id="hud">
+    <div class="hud-position">
+      <span class="pos-value" id="hud-pos">1</span><span class="pos-suffix" id="hud-pos-suffix">st</span>
+      <div class="pos-total">/ 2</div>
+    </div>
+    <div class="hud-info">
+      <div class="hud-info-item">
+        <div class="label">Lap</div>
+        <div class="value" id="hud-lap">1/3</div>
+      </div>
+      <div class="hud-info-item">
+        <div class="label">Time</div>
+        <div class="value" id="hud-time">0:00</div>
+      </div>
+      <div class="hud-info-item">
+        <div class="label">Best Lap</div>
+        <div class="value" id="hud-best">--</div>
+      </div>
+    </div>
+    <div class="hud-speed">
+      <div class="speed-value" id="hud-speed">0</div>
+      <div class="speed-unit">KM/H</div>
+    </div>
+    <div class="hud-minimap">
+      <canvas id="minimap-canvas" width="180" height="180"></canvas>
+    </div>
+    <div class="controls-hint">WASD / Arrow Keys to drive | SPACE to brake</div>
+  </div>
+
+  <div id="countdown"></div>
+
+  <div id="race-result">
+    <h2 id="result-title"></h2>
+    <div class="result-time" id="result-time"></div>
+    <div class="result-details" id="result-details"></div>
+    <div>
+      <button class="result-btn primary" id="retry-btn">Race Again</button>
+      <button class="result-btn secondary" id="menu-btn">Main Menu</button>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
